@@ -1,3 +1,10 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# Ambiente local (VS Code)
+.venv/
+local/_data/
+local/spark-warehouse/
+local/metastore_db/
+derby.log

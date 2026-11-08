@@ -1,0 +1,10 @@
+# Versões fixadas e compatíveis entre si (matriz de compatibilidade do Delta Lake):
+#   delta-spark 3.3.0  <->  Spark 3.5.3 (Delta 3.3.x = Spark 3.5.x; delta-spark exige pyspark>=3.5.3,<3.6)
+# Python suportado pelo PySpark 3.5: 3.8 a 3.11 (use 3.10 ou 3.11). Java: 17 (ver README).
+pyspark==3.5.3
+delta-spark==3.3.0
+
+# Necessários para toPandas() / Arrow (L1) e para os scripts. numpy<2 é o par seguro do PySpark 3.5.
+pandas==2.2.3
+numpy==1.26.4
+pyarrow==16.1.0

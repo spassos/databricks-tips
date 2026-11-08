@@ -1,0 +1,50 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "L1 · driver OOM (maxResultSize)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/local/L1_driver_oom.py",
+      "cwd": "${workspaceFolder}/local",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "L2 · skew join (AQE off)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/local/L2_skew_join.py",
+      "cwd": "${workspaceFolder}/local",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "L3 · spill em shuffle",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/local/L3_spill_shuffle.py",
+      "cwd": "${workspaceFolder}/local",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "L4 · pressão de GC",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/local/L4_gc_pressure.py",
+      "cwd": "${workspaceFolder}/local",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "L5 · data skipping Delta",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/local/L5_data_skipping_delta.py",
+      "cwd": "${workspaceFolder}/local",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

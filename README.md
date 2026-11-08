@@ -14,6 +14,7 @@ Comentários e markdown em português; as mensagens ao "cliente" estão em ingl�
 4. [Re-executar e limpar](#4-re-executar-e-limpar)
 5. [Limitações do serverless](#5-limitações-do-serverless)
 6. [Validar a sintaxe localmente](#6-validar-a-sintaxe-localmente)
+7. [Ambiente local (VS Code) com Spark UI](#7-ambiente-local-vs-code-com-spark-ui)
 
 ## 1. Importar no Databricks
 
@@ -150,3 +151,28 @@ python3 -m py_compile 00_setup.py 01_spark.py 02_delta.py 03_streaming.py 04_pla
 O `check_syntax.py` confere: cabeçalho `# Databricks notebook source`, `ast.parse` de cada célula Python (células `%md`, `%sql` e `%run` são puladas),
 as 4 etapas de cada cenário na ordem, a mensagem ao cliente com 3 frases, `spark.conf.set` sempre dentro de `try` e precedido do aviso
 "requer cluster clássico", ausência de RDD/`sparkContext`, e streams com `availableNow` + `awaitTermination`.
+
+## 7. Ambiente local (VS Code) com Spark UI
+
+O serverless não tem Spark UI e bloqueia várias configs, então os cenários que dependem delas (skew com AQE desligado, spill, GC,
+driver pequeno, data skipping com plano físico) têm uma versão **local** em [`local/`](local/README.md): PySpark 3.5.3 + Delta 3.3.0 em `local[4]`,
+Spark UI em `http://localhost:4040` e uma configuração de debug por cenário em `.vscode/launch.json`.
+
+| Script | Cenário |
+|---|---|
+| `local/L1_driver_oom.py` | Driver com pouca memória: `collect()`/`toPandas()` e `spark.driver.maxResultSize` |
+| `local/L2_skew_join.py` | Skew em join (chave quente + nulos), AQE desligado; broadcast, nulos, salting e AQE skew join |
+| `local/L3_spill_shuffle.py` | Spill de memória/disco com poucas partições de shuffle; ajuste de partições e AQE coalesce |
+| `local/L4_gc_pressure.py` | GC alto por cache pesado e UDF Python; funções nativas e `unpersist()` |
+| `local/L5_data_skipping_delta.py` | Data skipping em Delta: função na coluna vs intervalo, `OPTIMIZE ZORDER BY` |
+
+Pré-requisitos: **Java 17** e Python 3.10/3.11. Instalação resumida (detalhes, Java por sistema operacional e o guia
+**"Onde olhar na Spark UI"** estão em [`local/README.md`](local/README.md)):
+
+```bash
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -r local/requirements.txt
+python local/L2_skew_join.py      # ou F5 no VS Code; no final, abra http://localhost:4040 e aperte Enter para encerrar
+```
+
+A validação (`python3 scripts/check_syntax.py`) também cobre `local/*.py` e os JSON de `.vscode/`, sem as regras específicas do serverless.

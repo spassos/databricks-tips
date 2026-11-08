@@ -10,10 +10,14 @@ Checagens:
   * sem RDD / sparkContext (indisponíveis no serverless)
   * toda célula com writeStream usa availableNow e awaitTermination
   * 99_cheatsheet.py contém só markdown
+  * local/*.py (ambiente VS Code): ast.parse + 4 etapas + "Ao cliente" com 3 frases + pausa da Spark UI;
+    NÃO aplica as regras do serverless (spark.conf.set, RDD e sparkContext são permitidos lá)
+  * .vscode/launch.json e settings.json: JSON válido, com uma configuração por cenário local
 
 Uso: python3 scripts/check_syntax.py
 """
 import ast
+import json
 import re
 import sys
 from pathlib import Path
@@ -73,6 +77,69 @@ def check_conf_in_try(tree, errors, name, idx):
                     break
             if not inside_try:
                 errors.append(f"{name} célula {idx}: spark.conf.set fora de try/except (linha {node.lineno})")
+
+
+LOCAL_DIR = ROOT / "local"
+LOCAL_SCENARIOS = [
+    "L1_driver_oom.py",
+    "L2_skew_join.py",
+    "L3_spill_shuffle.py",
+    "L4_gc_pressure.py",
+    "L5_data_skipping_delta.py",
+]
+LOCAL_BANNERS = ['titulo("1. REPRODUZIR', 'titulo("2. DIAGNOSTICAR', 'titulo("3. CORRIGIR', 'titulo("4. AO CLIENTE']
+AO_CLIENTE_RE = re.compile(r'titulo\("4\. AO CLIENTE[^"]*"\).*?print\("""(.*?)"""\)', re.DOTALL)
+
+
+def check_local(errors):
+    """Ambiente local (VS Code): só sintaxe (ast.parse) + estrutura dos cenários. Sem as regras do serverless
+    (aqui spark.conf.set, RDD e sparkContext são permitidos)."""
+    if not LOCAL_DIR.exists():
+        errors.append("local/: pasta ausente")
+        return
+    py_files = sorted(LOCAL_DIR.glob("*.py"))
+    missing = [n for n in ["spark_session.py", *LOCAL_SCENARIOS] if not (LOCAL_DIR / n).exists()]
+    errors.extend(f"local/{n}: arquivo ausente" for n in missing)
+    for path in py_files:
+        rel = f"local/{path.name}"
+        text = path.read_text(encoding="utf-8")
+        try:
+            ast.parse(text)
+        except SyntaxError as e:
+            errors.append(f"{rel}: SyntaxError linha {e.lineno}: {e.msg}")
+            continue
+        if path.name in LOCAL_SCENARIOS:
+            for banner in LOCAL_BANNERS:
+                if text.count(banner) != 1:
+                    errors.append(f"{rel}: etapa {banner[8:]!r} deve aparecer exatamente uma vez")
+            if "pausar_ui(spark)" not in text:
+                errors.append(f"{rel}: faltou pausar_ui(spark) no final (Spark UI + input)")
+            m = AO_CLIENTE_RE.search(text)
+            if not m:
+                errors.append(f"{rel}: bloco 'AO CLIENTE' não encontrado")
+            else:
+                sentences = re.findall(r"[^.!?]+[.!?](?:\s|$)", " ".join(m.group(1).split()) + " ")
+                if len(sentences) != 3:
+                    errors.append(f"{rel}: 'Ao cliente' tem {len(sentences)} frases (esperado 3)")
+        print(f"✔ {rel}: sintaxe ok")
+
+    helper = (LOCAL_DIR / "spark_session.py")
+    if helper.exists():
+        h = helper.read_text(encoding="utf-8")
+        for needed in ("def get_spark(", "local[4]", "configure_spark_with_delta_pip", "spark.ui.port",
+                       "Spark UI: http://localhost:", "Pressione Enter para encerrar..."):
+            if needed not in h:
+                errors.append(f"local/spark_session.py: esperado conter {needed!r}")
+
+    # .vscode: JSON válido e uma configuração de debug por script
+    try:
+        launch = json.loads((ROOT / ".vscode" / "launch.json").read_text(encoding="utf-8"))
+        programs = " ".join(c.get("program", "") for c in launch.get("configurations", []))
+        errors.extend(f".vscode/launch.json: sem configuração para {n}" for n in LOCAL_SCENARIOS if n not in programs)
+        json.loads((ROOT / ".vscode" / "settings.json").read_text(encoding="utf-8"))
+        print("✔ .vscode/launch.json e settings.json: JSON válido")
+    except (OSError, json.JSONDecodeError) as e:
+        errors.append(f".vscode: {type(e).__name__}: {e}")
 
 
 def main():
@@ -162,12 +229,14 @@ def main():
 
         print(f"✔ {name}: {len(cells)} células ({n_py} de código)")
 
+    check_local(errors)
+
     if errors:
         print("\n❌ Problemas encontrados:")
         for e in errors:
             print("  -", e)
         return 1
-    print("\n✅ Todos os notebooks passaram.")
+    print("\n✅ Todos os arquivos passaram.")
     return 0
 
 
