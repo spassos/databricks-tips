@@ -22,32 +22,35 @@ Os notebooks do Databricks na raiz do repo **não são alterados** por nada daqu
 
 | Item | Versão | Observação |
 |---|---|---|
-| Python | **3.10 ou 3.11** | O PySpark 3.5 suporta Python 3.8 a 3.11 (evite 3.12+) |
-| Java | **17** (JDK) | Também roda em 21, mas 17 é o alvo desta pasta |
+| Python | **3.10 a 3.14** | O PySpark 4.2 suporta Python 3.10+ (testado em 3.14) |
+| Java | **17, 21 ou 25** (JDK) | Spark 4.2 roda em Java 17/21/25 (25 precisa ser ≥ 25.0.3). Testado com Temurin 25. Não use 26+ |
 | RAM | 8 a 16 GB | Os cenários usam 1 a 4 GB de heap + o processo Python |
 | Disco | ~5 GB livres | L3 grava *spill* em `local/_data/spark-tmp` (apagado ao final) |
-| Internet | no 1º run | O Spark baixa o jar do Delta (`io.delta:delta-spark_2.12:3.3.0`) do Maven Central; depois fica em cache (`~/.ivy2`) |
+| Internet | no 1º run | O Spark baixa o jar do Delta (`io.delta:delta-spark_4.2_2.13:4.4.1`) do Maven Central; depois fica em cache (`~/.ivy2`) |
 
 ### Versões fixadas (compatíveis entre si)
 
-`local/requirements.txt` fixa **`pyspark==3.5.3`** + **`delta-spark==3.3.0`**. Pela matriz de compatibilidade do Delta Lake,
-Delta **3.3.x** é construído sobre **Spark 3.5.x** (o pacote `delta-spark` 3.3.0 exige `pyspark>=3.5.3,<3.6`).
-`pandas`, `numpy` (<2) e `pyarrow` também ficam fixados, pois o `toPandas()` do L1 depende deles.
+`local/requirements.txt` fixa **`pyspark==4.2.0`** + **`delta-spark==4.4.1`** (o pacote `delta-spark` 4.4.1 exige
+`pyspark>=4.0.1,<=4.2.0`; por isso não usamos o pyspark 4.3). `pandas` (2.x), `numpy` (2.x) e `pyarrow` (>=18) ficam com
+faixas compatíveis, pois o `toPandas()` do L1 depende deles.
 
-> Se for trocar versões: Delta 2.4 ↔ Spark 3.4 · Delta 3.0 a 3.3 ↔ Spark 3.5 · Delta 4.0 ↔ Spark 4.0 (exige Java 17+ e Python 3.9+).
+> Se for trocar versões: Delta 3.0 a 3.3 ↔ Spark 3.5 · Delta 4.0 ↔ Spark 4.0 · Delta 4.1 a 4.3 ↔ Spark 4.0/4.1 · Delta 4.4 ↔ Spark até 4.2.
 > Troque `pyspark` e `delta-spark` **juntos** e confira a [matriz oficial](https://docs.delta.io/latest/releases.html).
 
-### Java 17: verificar
+### Java: verificar
 
 ```bash
-java -version      # deve mostrar: openjdk version "17.x.x" (ou "17.0.x" Temurin/Corretto/etc.)
+java -version      # deve mostrar: openjdk version "17.x", "21.x" ou "25.x" (Temurin/Corretto/etc.)
 echo $JAVA_HOME    # Windows (PowerShell): echo $env:JAVA_HOME
 ```
 
-Se `java` não existe ou mostra outra versão, instale o JDK 17:
+Se `java` não existe ou mostra outra versão, instale um JDK suportado (exemplos com 17; troque por 21 ou 25 se preferir):
 
 **macOS (Homebrew)**
 ```bash
+# Mac Intel em macOS recente: o formula openjdk@XX pode não ter bottle ("no bottle available").
+# Nesse caso use o cask (instala em /Library/Java/JavaVirtualMachines, sem o passo do ln):
+#   brew install --cask temurin@25 && echo 'export JAVA_HOME=$(/usr/libexec/java_home -v 25)' >> ~/.zshrc
 brew install openjdk@17
 sudo ln -sfn "$(brew --prefix openjdk@17)/libexec/openjdk.jdk" /Library/Java/JavaVirtualMachines/openjdk-17.jdk
 echo 'export JAVA_HOME=$(/usr/libexec/java_home -v 17)' >> ~/.zshrc && source ~/.zshrc
@@ -82,7 +85,7 @@ Na **raiz do repositório** (a pasta que contém `local/` e `.vscode/`):
 
 ```bash
 # 1) ambiente virtual em .venv (o .vscode/settings.json já aponta para ele)
-python3.11 -m venv .venv            # ou python3.10; no Windows: py -3.11 -m venv .venv
+python3 -m venv .venv              # Python 3.10 a 3.14; no Windows: py -3 -m venv .venv
 
 # 2) ativar
 source .venv/bin/activate           # Windows (PowerShell): .venv\Scripts\Activate.ps1
@@ -208,9 +211,9 @@ Endpoints úteis para explorar à mão: `/applications`, `/applications/<id>/sta
 
 | Sintoma | Causa provável | O que fazer |
 |---|---|---|
-| `JAVA_HOME is not set` / `java: command not found` | Java ausente ou fora do PATH | Instale o JDK 17 e defina `JAVA_HOME` (seção 1) |
-| `Unsupported class file major version` | Java mais novo/antigo que o suportado | Use o JDK 17 |
-| Falha ao baixar `delta-spark_2.12` (Ivy / Maven) | Sem internet ou proxy no 1º run | Rode uma vez com internet (ou configure o proxy do Java/Ivy); depois fica em `~/.ivy2` |
+| `JAVA_HOME is not set` / `java: command not found` | Java ausente ou fora do PATH | Instale um JDK 17/21/25 e defina `JAVA_HOME` (seção 1) |
+| `Unsupported class file major version` | Java mais novo/antigo que o suportado | Use JDK 17, 21 ou 25 |
+| Falha ao baixar `delta-spark_4.2_2.13` (Ivy / Maven) | Sem internet ou proxy no 1º run | Rode uma vez com internet (ou configure o proxy do Java/Ivy); depois fica em `~/.ivy2` |
 | `Address already in use` / UI em 4041 | Outra sessão Spark usando a 4040 | Encerre a outra sessão; o script imprime a porta real |
 | `py4j.protocol.Py4JNetworkError: Answer from Java side is empty` | A JVM morreu (normalmente `OutOfMemoryError`) | Veja o log acima do erro; aumente `spark.driver.memory` do cenário ou reduza `N` |
 | Cenário muito lento | Poucos cores ou pouca RAM | Reduza o `N` no topo do script (L1/L2/L3 aceitam facilmente) |
